@@ -1,7 +1,9 @@
+from groq import Groq
 from services.retrieval_service import search_chunk
 from services.arabic_normalizer import is_arabic
-import ollama
-from config import OLLAMA_MODEL, MAX_CONTEXT_CHARS
+from config import GROQ_API_KEY, GROQ_MODEL, MAX_CONTEXT_CHARS
+
+client = Groq(api_key=GROQ_API_KEY)
 
 ENGLISH_PROMPT = """You are a helpful teaching assistant.
 
@@ -77,12 +79,12 @@ def generate_response(question: str) -> dict:
     template = ARABIC_PROMPT if use_arabic else ENGLISH_PROMPT
     prompt   = template.format(context=context, question=question)
 
-    response = ollama.chat(
-        model    = OLLAMA_MODEL,
-        messages = [{"role": "user", "content": prompt}]
+    response = client.chat.completions.create(
+        model    = GROQ_MODEL,
+        messages = [{"role": "user", "content": prompt}],
     )
 
-    answer = response["message"]["content"].strip()
+    answer = response.choices[0].message.content.strip()
 
     if _is_refusal(answer):
         return {"answer": "لا أعرف." if use_arabic else "I don't know.", "sources": []}

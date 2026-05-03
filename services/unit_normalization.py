@@ -11,7 +11,7 @@ def normalize_units_for_document(document_id):
 
         if clean != unit.get("clean_text"):
             units_collection.update_one(
-                {"_id": unit["_id"]},
+                {"unit_id": unit["unit_id"]},
                 {"$set": {"clean_text": clean}}
             )
             modified += 1

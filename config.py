@@ -13,12 +13,12 @@ ALLOWED_MINE_TYPES = {
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx"
 }
 
-# MongoDB Configuration
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "rag_system")
+# Database Configuration (Supabase / PostgreSQL)
+SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL")
 
-# Embedding Configuration
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
+# Embedding Configuration (HuggingFace Inference API)
+HF_API_TOKEN    = os.getenv("HF_API_TOKEN")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 
 # Retrieval Configuration
 MIN_SIMILARITY_SCORE = float(os.getenv("MIN_SIMILARITY_SCORE", "0.4"))
@@ -26,6 +26,7 @@ MIN_SIMILARITY_SCORE = float(os.getenv("MIN_SIMILARITY_SCORE", "0.4"))
 # Vector Store (FAISS) Configuration
 VECTOR_STORE_DIR = os.getenv("VECTOR_STORE_DIR", "vector_store")
 
-# LLM Configuration
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+# LLM Configuration (Groq)
+GROQ_API_KEY     = os.getenv("GROQ_API_KEY")
+GROQ_MODEL       = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 MAX_CONTEXT_CHARS = int(os.getenv("MAX_CONTEXT_CHARS", "2000"))

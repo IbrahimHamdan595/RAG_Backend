@@ -1,64 +1,43 @@
-from sentence_transformers import SentenceTransformer
+import numpy as np
+from huggingface_hub import InferenceClient
 from models.model import chunks_collection
 from services.faiss_index import search_vectors
-from config import EMBEDDING_MODEL, MIN_SIMILARITY_SCORE
+from config import EMBEDDING_MODEL, HF_API_TOKEN, MIN_SIMILARITY_SCORE
 
-model = SentenceTransformer(EMBEDDING_MODEL)
+_client = InferenceClient(token=HF_API_TOKEN)
+
+
+def _embed(text: str) -> list[float]:
+    result = _client.feature_extraction(text, model=EMBEDDING_MODEL)
+    arr = np.asarray(result)
+    if arr.ndim == 2:
+        arr = arr.mean(axis=0)
+    return arr.tolist()
+
 
 def search_chunk(query: str, top_k: int = 5) -> list[dict]:
-    """
-    Search for the most relevant chunks using FAISS vector search.
+    query_vector = _embed(query)
 
-    Flow:
-      1. Encode the query into a vector
-      2. Ask FAISS for top-K nearest chunk_ids (fast — no Python loop)
-      3. Fetch the actual chunk text from MongoDB by chunk_id
-      4. Filter by minimum similarity score
+    results = search_vectors(query_vector, top_k=top_k)
 
-    Returns list of dicts with: chunk, score, unit_number, document_id
-    """
-
-    # 1️⃣ Encode query
-    query_vector = model.encode(query).tolist()
-
-    # 2️⃣ Search FAISS for top-K chunk_ids
-    faiss_results = search_vectors(query_vector, top_k=top_k)
-
-    if not faiss_results:
+    results = [(cid, score) for cid, score in results if score >= MIN_SIMILARITY_SCORE]
+    if not results:
         return []
 
-    # 3️⃣ Filter by minimum score threshold
-    faiss_results = [
-        (chunk_id, score)
-        for chunk_id, score in faiss_results
-        if score >= MIN_SIMILARITY_SCORE
+    chunk_id_list = [cid for cid, _ in results]
+    score_map     = {cid: score for cid, score in results}
+
+    chunks = chunks_collection.find({"chunk_id": {"$in": chunk_id_list}})
+    lookup = {c["chunk_id"]: c for c in chunks}
+
+    return [
+        {
+            "chunk":       lookup[cid]["text"],
+            "score":       score_map[cid],
+            "unit_number": lookup[cid].get("unit_number"),
+            "document_id": lookup[cid].get("document_id"),
+            "lang":        lookup[cid].get("lang", "en"),
+        }
+        for cid in chunk_id_list
+        if cid in lookup
     ]
-
-    if not faiss_results:
-        return []
-
-    # 4️⃣ Fetch chunk metadata from MongoDB using chunk_ids
-    chunk_id_list = [chunk_id for chunk_id, _ in faiss_results]
-    score_map     = {chunk_id: score for chunk_id, score in faiss_results}
-
-    mongo_chunks = chunks_collection.find({"chunk_id": {"$in": chunk_id_list}})
-
-    # Build a lookup dict so we preserve FAISS ranking order
-    chunk_lookup = {chunk["chunk_id"]: chunk for chunk in mongo_chunks}
-
-    # 5️⃣ Assemble results in FAISS score order
-    results = []
-    for chunk_id in chunk_id_list:
-        chunk = chunk_lookup.get(chunk_id)
-        if not chunk:
-            continue
-
-        results.append({
-            "chunk":       chunk["text"],
-            "score":       score_map[chunk_id],
-            "unit_number": chunk.get("unit_number"),
-            "document_id": chunk.get("document_id"),
-            "lang":        chunk.get("lang", "en"),
-        })
-
-    return results
